@@ -39,10 +39,6 @@ def main():
     speccheck_unsmooth(f"Lidar Data {height}m", lidar_data[col_name].dropna(), freqs_u, psd_u)
     speccheck_smooth(f"Lidar Data {height}m", lidar_data[col_name].dropna(), smoothed_freqs, smoothed_spectrum)
 
-    #Compute spectral acceleration from the wind speed power spectrum
-    spectral_accel_freq = compute_spectral_acceleration(freqs_u, psd_u)
-    #Apply smoothing to spectral acceleration
-    smoothed_accel_freqs, smoothed_accel_spectrum = smooth_criminal(spectral_accel_freq, freqs_u, n_per_decade)
     
     # Compute acceleration in the time domain (I think this works)
     spectral_accel_time = compute_spectral_acceleration_time(valid_data, fs) 
@@ -81,19 +77,10 @@ def main():
     plt.xlabel('Frequency [Hz]')
     plt.ylabel('Power Spectral Density')
     
-    #Spectral Acceleration (frequency domain)
-    plt.figure(figsize=(10, 6))
-    plt.loglog(freqs_u, spectral_accel_freq, color='red', label='Spectral Acceleration (Freq Domain)')
-    plt.loglog(smoothed_accel_freqs, smoothed_accel_spectrum, label='Smoothed Spectral Acceleration', linewidth=2, color='darkred')
-    plt.xlabel('Frequency [Hz]')
-    plt.ylabel('Spectral Acceleration [m²/s²/Hz]')
-    plt.legend()
-    plt.grid(True)
-    plt.title('Spectral Acceleration in Frequency Domain')
     
-    #Spectral acceleration time domain
+    #Acceleration time domain
     plt.figure(figsize=(10, 6))
-    plt.plot(timestamp[2:], spectral_accel_time_full[2:], label='Spectral Acceleration (Time Domain)', color='red', alpha=0.7)
+    plt.plot(timestamp, spectral_accel_time_full, label='Spectral Acceleration (Time Domain)', color='red', alpha=0.7)
     plt.xlabel('Time')
     plt.ylabel('Value')
     plt.legend()

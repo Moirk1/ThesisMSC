@@ -8,12 +8,6 @@ def compute_psd(time_series, fs):
     psd = (np.abs(fft_vals)**2) / (N*fs) #find  power spectral density
     return freqs[:N//2], psd[:N//2]  # Return only positive frequencies and corresponding PSD since FFT is symmetric for real time series
 
-#Get spectral acceleration from spectrum
-def compute_spectral_acceleration(freqs, psd):
-    """Compute the spectral acceleration from the power spectral density (PSD)."""
-    # Spectral acceleration is calculated as (2 * pi * f)^2 * PSD
-    spectral_accel = (2 * np.pi * freqs)**2 * psd
-    return spectral_accel
 
 #Use IFT to get spectral acceleration in time domain
 def compute_spectral_acceleration_time(time_series, fs):
@@ -22,7 +16,7 @@ def compute_spectral_acceleration_time(time_series, fs):
     freqs = np.fft.fftfreq(N, 1/fs) #find frequency bins(Number of samples, time step)
     fft_vals = np.fft.fft(time_series) #fft on time_series
     psd = (np.abs(fft_vals)**2) / (N*fs) #find  power spectral density
-    spectral_accel_fft = (2 * np.pi * freqs) ** 2 * psd  # Modify FFT spectrum
+    spectral_accel_fft = (2 * np.pi * freqs)*1j * fft_vals # Modify FFT spectrum
     spectral_accel_time = np.fft.ifft(spectral_accel_fft).real  # Inverse FFT back to time
     return spectral_accel_time
 
