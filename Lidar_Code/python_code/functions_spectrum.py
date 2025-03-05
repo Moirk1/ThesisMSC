@@ -105,8 +105,9 @@ def interpolate_with_threshold(data, threshold=2):
     
     return data_copy
 
-def compute_percentiles(time_series, window_size, percentiles=[75, 90]):
-    """Compute the desired percentiles (P75 and P90) for each window of data, ignoring NaNs."""
+#Find percentiles
+def compute_percentiles(time_series, window_size, percentiles=[90]):
+    """Compute the desired percentiles (P90) for each window of data, ignoring NaNs."""
     percentiles_values = {p: [] for p in percentiles}
     
     print(f"Length of time_series: {len(time_series)}")
@@ -135,3 +136,14 @@ def compute_percentiles(time_series, window_size, percentiles=[75, 90]):
         percentiles_values[p] = np.array(percentiles_values[p])
 
     return percentiles_values
+
+#Finite difference acceleration
+def central_diff_acceleration(velocity, delta_t):
+    velocity = np.array(velocity)
+    # Create an empty array to store acceleration values
+    acceleration = np.full_like(velocity, np.nan)  # Initialize with NaNs
+    # Iterate over the time series (starting from the second element and ending before the last element)
+    for t in range(1, len(velocity) - 1):
+        # Apply the central difference formula
+        acceleration[t] = (velocity[t + 1] - velocity[t - 1]) / (2 * delta_t)
+    return acceleration

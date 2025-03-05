@@ -8,7 +8,7 @@ def main():
     #Initial setup
     lidar_data = pd.read_csv('modified_lidar_data21_2025-02-13_113639.csv') #Import data files
     timestamp = lidar_data['Timestamp (s)']-808012801
-    height = 300 #set desired height column
+    height = 100 #set desired height column
     fs = (1/11) #Sample frequency in Hz
 
       # Construct the column name based on i
@@ -49,17 +49,24 @@ def main():
     
     # Insert the spectral acceleration values into the valid positions (where mask is True)
     spectral_accel_time_full[mask] = spectral_accel_time[:len(valid_data)]  # Match size by taking the first N elements
-   
+
+    #Finite difference
+    finite_accel = central_diff_acceleration(lidar_data[col_name], 11)
     # Create 3-minute windows for the acceleration time series
     window_size = int(180 / 11)  # Number of samples per 3-minute window
-    
-    # Compute the percentiles (P75 and P90) for each 3-minute window
-    percentiles_values = compute_percentiles(spectral_accel_time_full, window_size, percentiles=[75, 90])
-
-    # P75 and P90 percentiles
-    p75_values = percentiles_values[75]
+    #window_size1 = int(600/11)
+    # Compute the percentiles (P90) for each 3-minute window
+    percentiles_values = compute_percentiles(spectral_accel_time_full, window_size, percentiles=[90])
+    percentiles_finite = compute_percentiles(finite_accel, window_size, percentiles=[90] )
+    #percentiles_values1 = compute_percentiles(spectral_accel_time_full, window_size1, percentiles=[90])
+    # P90 accelerations
     p90_values = percentiles_values[90]
-    
+    p90_values1 = percentiles_finite[90]
+
+    #Stats on P90 accel
+    mean_p90 = np.mean(p90_values)
+    std_p90 = np.std(p90_values)
+  
     #PLOTTING
     #Spectrum
     plt.figure(figsize=(10, 6))
@@ -80,13 +87,25 @@ def main():
     
     #Acceleration time domain
     plt.figure(figsize=(10, 6))
-    plt.plot(timestamp, spectral_accel_time_full, label='Spectral Acceleration (Time Domain)', color='red', alpha=0.7)
-    plt.xlabel('Time')
-    plt.ylabel('Value')
+    plt.plot(timestamp/3600, spectral_accel_time_full, label='Spectral Acceleration (Time Domain)', color='red', alpha=0.7)
+    plt.plot(timestamp/3600, finite_accel, label='Finite Acceleration (Time Domain)', color='green', alpha=0.7)
+    plt.xlabel('Time [hr]')
+    plt.ylabel('Acceleration [m/s^2]')
     plt.legend()
     plt.grid(True)
-    plt.title('Wind Speed and Spectral Acceleration in Time Domain')
+    plt.title('Acceleration in Time Domain')
 
+
+
+    # 90th Percentile Histogram (Acceleration on x-axis)
+    plt.figure(figsize=(10, 6))
+    plt.hist(p90_values, bins=40, color='green', alpha=0.7, edgecolor='black', label ='spectralaccel')  # Customize the number of bins
+    plt.hist(p90_values1, bins=40, color='blue', alpha=0.7, edgecolor='black', label = 'finiteaccel' )
+    plt.xlabel('Acceleration (m/s²)')  # X-axis label (acceleration)
+    plt.ylabel('Frequency')  # Y-axis label (how often each acceleration value occurs)
+    plt.title('Histogram of 90th Percentile Acceleration')
+    plt.legend()
+    plt.grid(True)
 
     plt.show()
 
