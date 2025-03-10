@@ -108,8 +108,7 @@ def unsteady_state(t, state, V_w, V_r, beta, m):
     V_k = state[0]
     V_rel, alpha = relative_wind_speed(V_w, V_r, V_k)
     L, D = calculate_forces(V_rel, alpha)
-     # Debug prints
-    print(f"t={t:.2f}, V_k={V_k:.2f}, V_rel={V_rel:.2f}, alpha={alpha:.2f}, L={L:.2f}, D={D:.2f}")
+
     # Compute forces in normal and tangential directions
     F_N = L * np.cos(alpha) + D * np.sin(alpha)
     F_T = -L * np.sin(alpha) + D * np.cos(alpha)
@@ -123,5 +122,26 @@ def unsteady_state(t, state, V_w, V_r, beta, m):
     
     return dV_k_dt
 
+# Use optimized V_k as the initial condition (if it varies from optimised it will either decrease or increase)
+V_k_initial = V_k_optimized*1.01
 
+# Time span for integration
+t_span = [0, 20]  # Simulate for 10 seconds
+t_eval = np.linspace(0, 20, 200)  # Generate 100 time points for evaluation
 
+# Solve the ODE using solve_ivp
+sol = solve_ivp(unsteady_state, t_span, [V_k_initial], 
+                args=(V_w, V_r, beta, m), method='RK45', t_eval=t_eval, max_step=0.01)
+print(sol.t)
+print(sol.y[0])
+# Plot results
+
+plt.figure(figsize=(8, 5))
+plt.plot(sol.t, sol.y[0], label="V_k (Lateral Velocity)")
+plt.xlabel("Time (s)")
+plt.ylabel("Velocity (m/s)")
+plt.title("Unsteady-State Behavior of Kite Velocity")
+plt.yticks(np.arange(min(sol.y[0]-5), max(sol.y[0]) + 5, 1))  # Adjust interval (e.g., 1 m/s)
+plt.legend()
+plt.grid()
+plt.show()
