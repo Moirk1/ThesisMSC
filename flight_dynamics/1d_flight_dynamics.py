@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.optimize as opt
 import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
 
 # Constants and Parameters (I'm using Makani Properties for aircraft mass and wing area)
 rho = 1.225  # Air density (kg/m^3)
@@ -10,8 +11,9 @@ a = 0.1  # Drag coefficient scaling factor
 m = 1730.8  # Aircraft mass (kg)
 
 # Initial conditions (Assumed constant to start with)
-V_r = 6  # m/s (reel out speed)
+
 V_w = 12 # m/s (wind speed)
+V_r =  V_w*(1/3) # m/s (reel out speed) from kitemill site
 beta = np.radians(10)  # Chord angle in radians (10 degrees)
 
 # Function to calculate lift coefficient (C_L) based on angle of attack
@@ -99,3 +101,27 @@ def steady_state_solver(V_w, V_r, beta):
 # Call the steady-state solver
 V_k_optimized = steady_state_solver(V_w, V_r, beta)
 print(f"Optimized lateral velocity (V_k): {V_k_optimized:.2f} m/s")
+
+
+#FROM HERE I'M GETTING PROBLEMS MY V_K EITHER EXPLODES OR NEVER STOPS DECREASING BASED ON WHAT I CHOOSE
+def unsteady_state(t, state, V_w, V_r, beta, m):
+    V_k = state[0]
+    V_rel, alpha = relative_wind_speed(V_w, V_r, V_k)
+    L, D = calculate_forces(V_rel, alpha)
+     # Debug prints
+    print(f"t={t:.2f}, V_k={V_k:.2f}, V_rel={V_rel:.2f}, alpha={alpha:.2f}, L={L:.2f}, D={D:.2f}")
+    # Compute forces in normal and tangential directions
+    F_N = L * np.cos(alpha) + D * np.sin(alpha)
+    F_T = -L * np.sin(alpha) + D * np.cos(alpha)
+    
+    # Compute lateral and x-direction forces
+    F_y = F_N * np.sin(beta) + F_T * np.cos(beta)
+    F_x = F_N * np.cos(beta) - F_T * np.sin(beta)
+
+    # Solve ODEs: m * dV_k/dt = F_y, m * dV_x/dt = F_x
+    dV_k_dt = F_y / m
+    
+    return dV_k_dt
+
+
+
