@@ -19,6 +19,7 @@ angles_of_attack = []
 lift_forces = []
 drag_forces = []
 tension_forces = []
+power_harvested = []
 
 # Loop over different wind speeds
 for v_w in wind_speeds:
@@ -36,18 +37,27 @@ for v_w in wind_speeds:
     # Compute aerodynamic coefficients
     CL = 2 * np.pi * alpha  # Lift coefficient
     CD = CD0 + a * CL**2    # Drag coefficient
-    
+    CR = np.sqrt(CL**2+CD**2)
     # Compute forces
     L = 0.5 * CL * rho * A * v_a**2
     D = 0.5 * CD * rho * A * v_a**2
     
     # Compute tension force
     Ft = np.sqrt(L**2 + D**2)
+
+    # Compute the wing speed ratio λ
+    lambda_w = v_a / v_w
+    
+    # Compute power harvesting factor
+    zeta = (lambda_w**2 * CR - lambda_w**3 * CD)
+    
     
     # Store forces
     lift_forces.append(L)
     drag_forces.append(D)
     tension_forces.append(Ft)
+    power_harvested.append(zeta)
+
 
 # Plot results
 plt.figure(figsize=(10, 5))
@@ -67,6 +77,15 @@ plt.xlabel("Wind Speed (m/s)")
 plt.ylabel("Force (N)")
 plt.legend()
 plt.grid()
-
 plt.tight_layout()
+plt.show()
+# Forces and power plot
+plt.plot()
+plt.plot(wind_speeds, power_harvested, label="Power Harvested (W)", linestyle='--')
+plt.xlabel("Wind Speed (m/s)")
+plt.ylabel("Power Harvesting Factor [-]")
+plt.legend()
+plt.grid()
+
+
 plt.show()
