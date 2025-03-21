@@ -3,33 +3,50 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 def main():
-    flight_data = pd.read_csv('2024_week_17_thu_03\kite.csv')
-    timestamp = flight_data['epoch_ms']-flight_data['epoch_ms'][0] #Changing start time to 0
+    # Load the flight data
+    flight_data = pd.read_csv('2024_week_17_thu_03\\kite.csv')
+    timestamp1 = flight_data['epoch_ms'] - flight_data['epoch_ms'][0] 
+    # Make a copy of the original data for comparison 
+    modified_data = flight_data.copy()  # Create a copy of the original data
+    timestamp = modified_data['epoch_ms'] - modified_data['epoch_ms'][0]  # Adjust timestamp to start at 0
   
-   
-       # Get the tether length data
-    tether_length = flight_data['tether_length'].values
-    
-    # Step 1: Apply a smoothing function (e.g., moving average or polynomial fit)
+    # Get the tether length data
+    tether_length = modified_data['tether_length'].values
+
+    # Step 1: Manually takeoff and landing periods 
+    takeoff_end_index = 2000  
+    landing_start_index = 83600  
+
+    # Set NaNs from the start to takeoff_end_index (this can be your takeoff period)
+    modified_data.iloc[:takeoff_end_index + 1, 1:] = np.nan  # Skip the first column (timestamp)
+
+    # Set NaNs from landing_start_index to the end of the dataset (this can be your landing period)
+    modified_data.iloc[landing_start_index:, 1:] = np.nan  # Skip the first column (timestamp)
+
+    # Step 2: Apply a smoothing function 
     window_size = 200  # Define the window size for the moving average
     smoothed_tether_length = np.convolve(tether_length, np.ones(window_size)/window_size, mode='same')
     
-    # Step 2: Compute the slope (derivative) of the smoothed signal
+    # Step 3: Compute the slope (derivative) of the smoothed signal
     slope = np.diff(smoothed_tether_length)
     
-    # Step 3: Identify segments with a negative slope and set them to NaN
+    # Step 4: Identify segments with a negative slope and set them to NaN
     tether_length_with_nans = tether_length.copy()
     tether_length_with_nans[1:][slope < 0] = np.nan  # Skip the first element as np.diff reduces length by 1
-
-    # Step 4: Plot the results
+    # Step 5: Propagate NaNs from the 'tether_length_with_nans' column to all other columns (except timestamp)
+    for column in flight_data.columns:
+        if column != 'epoch_ms':  # Don't apply NaN to the 'epoch_ms' (timestamp) column
+            modified_data[column] = np.where(np.isnan(tether_length_with_nans), np.nan, modified_data[column])
+    
+    # Step 5: Plot the results
     plt.figure(figsize=(10, 6))
-    plt.plot(timestamp, tether_length_with_nans, label='Tether Length with Negative Slopes Removed')
-    plt.plot(timestamp, smoothed_tether_length, label='Smoothed Trend', linestyle='--', color='red')
+    plt.plot(timestamp, tether_length_with_nans, label='Original Tether Length', color='blue')
+    plt.plot(timestamp1, flight_data['tether_length'], color = 'red', linestyle = '--')
     plt.xlabel('Time [s]')
     plt.ylabel('Tether Length [m]')
     plt.grid(True)
     plt.legend()
-    plt.title('Tether Length Over Time (Negative Slopes Removed, Smoothed Trend)')
+    plt.title('Tether Length with NaNs During Takeoff, Landing, and Negative Slopes')
     plt.show()
-   
+
 main()
