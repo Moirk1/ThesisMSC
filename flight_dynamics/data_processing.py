@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import os
 
 def main():
     # Load the flight data
@@ -38,15 +39,24 @@ def main():
         if column != 'epoch_ms':  # Don't apply NaN to the 'epoch_ms' (timestamp) column
             modified_data[column] = np.where(np.isnan(tether_length_with_nans), np.nan, modified_data[column])
     
+
+    # Extract the original filename without extension
+    original_filename = os.path.splitext('2024_week_17_thu_03\\kite.csv')[0]
+    # Create a new filename for the modified dataset
+    new_filename = f"{original_filename}_power_production.csv"
+    # Save the modified dataset
+    modified_data.to_csv(new_filename, index=False)
+    
     # Step 5: Plot the results
     plt.figure(figsize=(10, 6))
-    plt.plot(timestamp, tether_length_with_nans, label='Original Tether Length', color='blue')
-    plt.plot(timestamp1, flight_data['tether_length'], color = 'red', linestyle = '--')
+    plt.plot(timestamp1, flight_data['tether_length'], label = 'Initial dataset', color = 'red', linestyle = '--')
+    plt.plot(timestamp, tether_length_with_nans, label='Power Production Phase', color='blue')
     plt.xlabel('Time [s]')
     plt.ylabel('Tether Length [m]')
     plt.grid(True)
     plt.legend()
-    plt.title('Tether Length with NaNs During Takeoff, Landing, and Negative Slopes')
+    #plt.title('Tether Length with NaNs During Takeoff, Landing, and Negative Slopes')
+    #plt.savefig('tether_length_plot.pdf', format='pdf')
     plt.show()
 
 main()
