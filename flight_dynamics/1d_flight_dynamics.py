@@ -58,9 +58,6 @@ def steady_state(V_k, V_w, V_r, beta):
     F_x = F_N * np.cos(beta) - F_T * np.sin(beta)
     F_y = F_N * np.sin(beta) + F_T * np.cos(beta)
     
-    # Print the current F_y to track it
-    #print(f"V_k = {V_k:.2f} m/s, F_y = {F_y:.2f} N")
-    
     return F_y**2  # minimise squared lateral force
 
 # Function to solve the steady-state problem and find the V_k that minimises Fy
