@@ -2,12 +2,13 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Constants
+# ---CONSTANT DEFINITIONS---
 rho = 1.225  # Air density (kg/m³)
-A = 3       # Kite area (m²)
+A =  2.982      # Kite area (m²)
 CD0 = 0.004  # Minimum drag coefficient
 a = 0.008    # Drag coefficient scaling factor
 
+#----FUNCTION DEFINITIONS ----------
 def quaternion_to_euler(q_nb):
     """
     Convert quaternion to Euler angles (degrees)
@@ -78,20 +79,47 @@ def calculate_airspeed_and_aoa(v_body, wind_ned, q_nb):
     v_a_xb = apparent_wind_body[0]  # Apparent wind component along the x-axis (forward)
 
     alpha = np.arctan2(v_a_zb, v_a_xb)
+    alpha_deg = np.rad2deg(alpha)   # Convert angle of attack from radians to degrees
 
-    # Convert angle of attack from radians to degrees
-    alpha_deg = np.rad2deg(alpha)
+    return airspeed, alpha_deg, alpha
 
-    return airspeed, alpha_deg
-
+def compute_aero_forces(V_rel, alpha, A, rho, C_D0, a):
+    """
+    Computes lift, drag and aerodynamic forces on the aircraft (no tether drag is included)
     
+    """
+    # Lift coefficient from angle of attack
+    C_L = 2 * np.pi * alpha
+    
+    # Airfoil drag coefficient
+    C_D_airfoil = C_D0 + a * C_L**2
+
+    # Dynamic pressure
+    q = 0.5 * rho * V_rel**2
+
+    # Lift and Drag forces
+    L = q * A * C_L
+    D = q * A * C_D_airfoil
+
+    #Aerodynamic Force
+    F_a = np.sqrt(L**2 + D**2)
+
+    return C_L, C_D_airfoil, L, D, F_a
+
+
+#----MAIN SECTION -----    
 # Load your CSV data
 simulation_data = pd.read_csv("simulation_results.csv")
 timestamp = simulation_data['time']
 
 # Initialize lists to store calculated and real values
 calculated_airspeed = []
-calculated_aoa = []  # Angle of attack
+calculated_aoa_deg = [] 
+calculated_Cl = []
+calculated_CD = []
+calculated_lift = []
+calculated_drag = []
+calculated_Fa = []
 real_airspeed = simulation_data['V_a'].values  # Real airspeed from the dataset
 real_aoa = simulation_data['alpha'].values  # Real angle of attack from the dataset
 
@@ -104,32 +132,89 @@ for index, row in simulation_data.iterrows():
     q_nb = np.array([row['eta_nb'], row['epsilon1_nb'], row['epsilon2_nb'], row['epsilon3_nb']])  # Quaternion
 
     # Calculate airspeed for this row
-    V_a, alpha_deg = calculate_airspeed_and_aoa(v_body, wind_ned, q_nb)
+    V_a, alpha_deg, alpha = calculate_airspeed_and_aoa(v_body, wind_ned, q_nb)
+    C_L, C_D_airfoil, L, D, F_a = compute_aero_forces(V_a, alpha, A, rho, CD0, a)
+
+    #Append values to list
     calculated_airspeed.append(V_a)
-    calculated_aoa.append(alpha_deg)
+    calculated_aoa_deg.append(alpha_deg)
+    calculated_Cl.append(C_L)
+    calculated_CD.append(C_D_airfoil)
+    calculated_lift.append(L)
+    calculated_drag.append(D)
+    calculated_Fa.append(F_a)
    
+
 # Convert lists to numpy arrays for easier plotting
 calculated_airspeed = np.array(calculated_airspeed)
-calculated_aoa = np.array(calculated_aoa)
+calculated_aoa_deg = np.array(calculated_aoa_deg)
+calculated_Cl= np.array(calculated_Cl)
+calculated_Cd = np.array(calculated_CD)
+calculated_lift = np.array(calculated_lift)
+calculated_drag = np.array(calculated_drag)
+calculated_Fa = np.array(calculated_Fa)
 
+
+#-------------- PLOTTING -------------------
 #Airspeed plot
 plt.figure(figsize=(8, 6))
 plt.plot(timestamp, real_airspeed, label='Real Airspeed', color='blue', linestyle='-')
 plt.plot(timestamp, calculated_airspeed, label='Calculated Airspeed', color='red', linestyle='--')
-plt.xlabel('Time (s)')
-plt.ylabel('Airspeed (m/s)')
-plt.title('Real vs Calculated Airspeed')
+plt.xlabel('Time [s]')
+plt.ylabel('Airspeed [m/s]')
 plt.legend()
+plt.grid()
 plt.tight_layout()
+plt.savefig('airspeed_real_vs_calculated_sim.pdf')
 
 # Angle of attack plot
 plt.figure(figsize=(8, 6))
-plt.plot(timestamp, real_aoa, label='Real AoA', color='green', linestyle='-')
-plt.plot(timestamp, calculated_aoa, label='Calculated AoA', color='orange', linestyle='--')
-plt.xlabel('Time (s)')
-plt.ylabel('Angle of Attack (degrees)')
-plt.title('Real vs Calculated Angle of Attack')
+plt.plot(timestamp, real_aoa, label='Real AoA', color='blue', linestyle='-')
+plt.plot(timestamp, calculated_aoa_deg, label='Calculated AoA', color='red', linestyle='--')
+plt.xlabel('Time [s]')
+plt.ylabel('Angle of Attack [degrees]')
 plt.legend()
+plt.grid()
+plt.tight_layout()
+plt.savefig('aoa_real_vs_calculated_sim.pdf')
+
+# Plot C_L and C_D vs AOA
+fig, axs = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+
+axs[0].plot(calculated_aoa_deg, calculated_Cl, label='Calculated C_L', color='blue', linestyle='-')
+axs[0].set_ylabel('C_L [-]')
+axs[0].legend()
+axs[0].grid(True)
+
+axs[1].plot(calculated_aoa_deg, calculated_CD, label='Calculated C_D', color='red', linestyle='-')
+axs[1].set_xlabel('AOA [deg]')
+axs[1].set_ylabel('C_D [-]')
+axs[1].legend()
+axs[1].grid(True)
+plt.tight_layout()
+
+# Plot Lift and Drag vs time
+fig, axs = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+
+axs[0].plot(timestamp, calculated_lift, label='Calculated Lift', color='blue', linestyle='-')
+axs[0].set_ylabel('Lift [N]')
+axs[0].legend()
+axs[0].grid(True)
+
+axs[1].plot(timestamp, calculated_drag, label='Calculated Drag', color='red', linestyle='-')
+axs[1].set_xlabel('Time [s]')
+axs[1].set_ylabel('Drag [N]')
+axs[1].legend()
+axs[1].grid(True)
+plt.tight_layout()
+
+# Plot Aerodynamic Force vs time
+plt.figure(figsize=(8, 6))
+plt.plot(timestamp, calculated_Fa, label='Aerodynamic Force', color='blue', linestyle='-')
+plt.xlabel('Time [s]')
+plt.ylabel('Aerodynamic Force [N]')
+plt.legend()
+plt.grid()
 plt.tight_layout()
 
 plt.show()
