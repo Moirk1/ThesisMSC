@@ -178,35 +178,49 @@ plt.grid()
 plt.tight_layout()
 plt.savefig('aoa_real_vs_calculated_sim.pdf')
 
-# Plot C_L and C_D vs AOA
-fig, axs = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
-
-axs[0].plot(calculated_aoa_deg, calculated_Cl, label='Calculated C_L', color='blue', linestyle='-')
-axs[0].set_ylabel('C_L [-]')
-axs[0].legend()
-axs[0].grid(True)
-
-axs[1].plot(calculated_aoa_deg, calculated_CD, label='Calculated C_D', color='red', linestyle='-')
-axs[1].set_xlabel('AOA [deg]')
-axs[1].set_ylabel('C_D [-]')
-axs[1].legend()
-axs[1].grid(True)
+# Plot C_L vs AOA
+fig1 = plt.figure(figsize=(10, 6))
+plt.plot(calculated_aoa_deg, calculated_Cl, label='Calculated C_L', color='blue', linestyle='-')
+plt.xlabel('AOA [deg]', fontsize=16)
+plt.ylabel('C_L [-]', fontsize=16)
+plt.legend(fontsize=16)
+plt.grid(True)
+plt.tick_params(axis='both', labelsize=14)  # Increase tick label size
 plt.tight_layout()
+plt.savefig('C_L_vs_AOA.pdf')  # Save the plot as a separate PDF
 
-# Plot Lift and Drag vs time
-fig, axs = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
-
-axs[0].plot(timestamp, calculated_lift, label='Calculated Lift', color='blue', linestyle='-')
-axs[0].set_ylabel('Lift [N]')
-axs[0].legend()
-axs[0].grid(True)
-
-axs[1].plot(timestamp, calculated_drag, label='Calculated Drag', color='red', linestyle='-')
-axs[1].set_xlabel('Time [s]')
-axs[1].set_ylabel('Drag [N]')
-axs[1].legend()
-axs[1].grid(True)
+# Plot C_D vs AOA
+fig2 = plt.figure(figsize=(10, 6))
+plt.plot(calculated_aoa_deg, calculated_CD, label='Calculated C_D', color='red', linestyle='-')
+plt.xlabel('AOA [deg]', fontsize=16)
+plt.ylabel('C_D [-]', fontsize=16)
+plt.legend(fontsize=16)
+plt.grid(True)
+plt.tick_params(axis='both', labelsize=14)
 plt.tight_layout()
+plt.savefig('C_D_vs_AOA.pdf')  # Save the plot as a separate PDF
+
+# Plot Lift vs Time
+fig3 = plt.figure(figsize=(10, 6))
+plt.plot(timestamp, calculated_lift, label='Calculated Lift', color='blue', linestyle='-')
+plt.xlabel('Time [s]', fontsize=16)
+plt.ylabel('Lift [N]', fontsize=16)
+plt.legend(fontsize=16)
+plt.grid(True)
+plt.tick_params(axis='both', labelsize=14)
+plt.tight_layout()
+plt.savefig('Lift_vs_Time.pdf')  # Save the plot as a separate PDF
+
+# Plot Drag vs Time
+fig4 = plt.figure(figsize=(10, 6))
+plt.plot(timestamp, calculated_drag, label='Calculated Drag', color='red', linestyle='-')
+plt.xlabel('Time [s]', fontsize=16)
+plt.ylabel('Drag [N]', fontsize=16)
+plt.legend(fontsize=16)
+plt.grid(True)
+plt.tick_params(axis='both', labelsize=14)
+plt.tight_layout()
+plt.savefig('Drag_vs_Time.pdf')  # Save the plot as a separate PDF
 
 # Plot Aerodynamic Force vs time
 plt.figure(figsize=(8, 6))
@@ -216,5 +230,6 @@ plt.ylabel('Aerodynamic Force [N]')
 plt.legend()
 plt.grid()
 plt.tight_layout()
+plt.savefig('Fa_vs_time.pdf')
 
 plt.show()
