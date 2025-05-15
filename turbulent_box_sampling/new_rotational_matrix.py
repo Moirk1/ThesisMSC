@@ -17,9 +17,11 @@ print("Data Shape (u, v, w):", data_u.shape, data_v.shape, data_w.shape)
 
 # --- FUNCTIONS ---
 
+# Samples a turbulent velocity field along a helical trajectory through a moving wind box
 def helical_sample_velocity_field_physical_moving_box(data_u, data_v, data_w,
                                                       U_box, radius_m=60, T_loop=10, 
                                                       total_time=100, DX=0.3632, DY=7.5, DZ=7.5):
+
     Nx, Ny, Nz = data_u.shape
     U_kite_box = 1/3 * U_box
     dt = 0.1  # seconds per sample
@@ -48,55 +50,91 @@ def helical_sample_velocity_field_physical_moving_box(data_u, data_v, data_w,
     print("Helical samples:", helical_samples.shape)
     return helical_samples, sample_coords_grid, sample_coords_phys
 
-"""
-def calculate_airspeed_and_aoa_from_global(v_kite_global, v_windglobal, R_total):
-    v_wind_body = R_total @ v_windglobal
-    v_kite_body = R_total @ v_kite_global
-    v_apparent = v_kite_body - v_wind_body
-    
-    airspeed = np.linalg.norm(v_apparent)
-    alpha_rad = np.arctan2(v_apparent[2], v_apparent[0])
-    alpha_deg = np.degrees(alpha_rad)
-    return v_kite_body, airspeed, alpha_deg, alpha_rad
+#Computes aerodynamic forces and body-frame velocities of a kite moving through a turbulent wind field.
+def compute_aerodynamics(t, x, y, z, v_global, samples,
+                         U_mean, rho, A, CD0, a, DY, DZ, Ny, Nz,
+                         fix_aoa_deg=None, pitch_reference=None):
+    airspeeds = []
+    apparent_wind_angle_deg = []
+    lift = []
+    drag = []
+    F_aero = []
+    aoa_deg_corrected = []
 
-def get_rotation_matrix(gamma_rad, psi_rad):
-    # Rotation matrix for -90 degrees around the y-axis
-    R_y90 = np.array([[0, 0, 1],
-                      [0, 1, 0],
-                      [-1, 0, 0]])
-    return R_y90
+    v_body_x = []
+    v_body_y = []
+    v_body_z = []
 
-   
-    R_ygamma = np.array([[np.cos(-gamma_rad), 0, -np.sin(-gamma_rad)],
-                         [0, 1, 0],
-                         [np.sin(-gamma_rad), 0, np.cos(-gamma_rad)]])
-    
-    # Rotation matrix for -psi around the z''-axis
-    R_zpsi = np.array([[np.cos(-psi_rad), np.sin(-psi_rad), 0],
-                        [-np.sin(-psi_rad), np.cos(-psi_rad), 0],
-                        [0, 0, 1]])
+    y_offset = (Ny * DY) / 2
+    z_offset = (Nz * DZ) / 2
 
-    # Total rotation matrix is the product of these three rotations
-    R_total = R_zpsi @ R_ygamma @ R_y90
-    
+    for i in range(len(t)):
+        v_kite_global_i = v_global[i]
+        v_windglobal_i = np.array([U_mean, 0, 0]) + samples[i, :]
+
+        # Body-frame basis
+        X_body = v_kite_global_i / np.linalg.norm(v_kite_global_i)
+        radial_vec = np.array([0, y_offset - y[i], z_offset - z[i]])
+        Y_body = -radial_vec / np.linalg.norm(radial_vec)
+        Z_body = np.cross(X_body, Y_body)
+        Z_body /= np.linalg.norm(Z_body)
+        Y_body = np.cross(Z_body, X_body)
+        Y_body /= np.linalg.norm(Y_body)
+
+        R_nb = np.column_stack((X_body, Y_body, Z_body))
+
+        v_kite_body = R_nb.T @ v_kite_global_i
+        v_wind_body = R_nb.T @ v_windglobal_i
+        v_apparent = v_kite_body - v_wind_body
+
+        airspeed = np.linalg.norm(v_apparent)
+        awa_rad = np.arctan2(v_apparent[2], v_apparent[0])  # AoA
+        awa_deg = np.degrees(awa_rad)
+
+        # Default AoA = AWA if nothing fixed
+        aoa_deg = awa_deg
+        if fix_aoa_deg is not None and pitch_reference is None:
+            # We're computing pitch from fixed AoA
+            aoa_deg = fix_aoa_deg
+        elif pitch_reference is not None:
+            # We're using provided pitch to compute AoA
+            aoa_deg = awa_deg - pitch_reference[i]
+
+        aoa_rad = np.radians(aoa_deg)
+
+        # Aerodynamics
+        C_L = 2 * np.pi * aoa_rad
+        C_D_airfoil = CD0 + a * C_L**2
+        q = 0.5 * rho * airspeed**2
+
+        L = q * A * C_L
+        D = q * A * C_D_airfoil
+        F_a = np.sqrt(L**2 + D**2)
+
+        # Store
+        airspeeds.append(airspeed)
+        apparent_wind_angle_deg.append(awa_deg)
+        aoa_deg_corrected.append(aoa_deg)
+        lift.append(L)
+        drag.append(D)
+        F_aero.append(F_a)
+        v_body_x.append(v_kite_body[0])
+        v_body_y.append(v_kite_body[1])
+        v_body_z.append(v_kite_body[2])
+
+    return {
+        'airspeed': np.array(airspeeds),
+        'awa_deg': np.array(apparent_wind_angle_deg),
+        'aoa_deg': np.array(aoa_deg_corrected),
+        'lift': np.array(lift),
+        'drag': np.array(drag),
+        'F_aero': np.array(F_aero),
+        'v_body': np.vstack((v_body_x, v_body_y, v_body_z)).T
+    }
 
 
-def skew_matrix(w):
-    Define the skew-symmetric matrix for the rotation vector [0, 0, -w]
-    return np.array([[0, 0, 0],
-                     [0, 0, -w],
-                     [0, w, 0]])
 
-
-def update_rotation_matrix(R0, w):
-    Updates the rotation matrix using the skew-symmetric matrix and the initial R0.
-    skew_w = skew_matrix(w)
-    # Cross product to update rotation matrix
-    R_new = R0 @ skew_w
-    return R_new
-"""
-
-# --- Sampling ---
+# --- Sampling  of Turbulence Field ---
 samples, coords_grid, coords_phys = helical_sample_velocity_field_physical_moving_box(
     data_u, data_v, data_w, U_box = 8.5,
     radius_m=60,
@@ -104,6 +142,8 @@ samples, coords_grid, coords_phys = helical_sample_velocity_field_physical_movin
     total_time=330,
     DX=0.3632, DY=7.5, DZ=7.5
 )
+
+samples_noturb = np.zeros_like(samples)
 
 dt = 0.1
 t = np.linspace(0, dt * len(samples), len(samples), endpoint=False)
@@ -121,10 +161,7 @@ dvy = np.gradient(dy, dt)
 dvz = np.gradient(dz, dt)
 a_global = np.vstack((dvx, dvy, dvz)).T
 
-
-# Store the values for plotting
-gamma_rad = np.arcsin(dz / v_mag)
-gamma_deg = np.degrees(gamma_rad)
+#Compute the circumferential angle
 DY = 7.5
 DZ = 7.5
 y_offset = (Ny * DY) / 2
@@ -132,66 +169,28 @@ z_offset = (Nz * DZ) / 2
 phi_rad = np.arctan2(z - z_offset, y - y_offset)
 phi_deg = np.degrees(phi_rad)
 
-# --- Initialise list to store components ---
-airspeeds = []
-apparent_wind_angle_deg = []  
-v_body_x = []
-v_body_y = []
-v_body_z = []
+#---Calculate Aero parameters for steady & unsteady wind---
+results_noturb = compute_aerodynamics(
+    t, x, y, z, v_global, samples_noturb,
+    U_mean=8.5, rho=1.225, A=2.982, CD0=0.004, a=0.008,
+    DY=7.5, DZ=7.5, Ny=Ny, Nz=Nz,
+    fix_aoa_deg=6.0  
+)
 
-# Initialize R0 with the first rotation matrix (for the first timestep)
-#R0 = get_rotation_matrix(gamma_rad[0], phi_rad[0])
+pitch_deg = results_noturb['awa_deg'] - results_noturb['aoa_deg']
+print(pitch_deg)
 
-for i in range(len(t)):
-    v_kite_global_i = v_global[i]
-    v_windglobal_i = np.array([8.5, 0, 0]) + samples[i, :]
-
-    # --- Step 1: Tangential direction of motion (X_body)
-    X_body = v_kite_global_i / np.linalg.norm(v_kite_global_i)
-
-    # --- Step 2: Radial vector from position to helix center in YZ
-    # Since helix is in YZ plane and center is at y_offset, z_offset
-    radial_vec = np.array([0, y_offset - y[i], z_offset - z[i]])
-    radial_vec_outward = -radial_vec 
-    Y_body = radial_vec_outward / np.linalg.norm(radial_vec_outward)
-
-    # --- Step 3: Z_body = Cross product (right-hand rule)
-    Z_body = np.cross(X_body, Y_body)
-    Z_body /= np.linalg.norm(Z_body)
-
-    # --- Re-orthonormalize Y_body = Z x X (more robust)  [Fixes edges]
-    Y_body = np.cross(Z_body, X_body)
-    Y_body /= np.linalg.norm(Y_body)
-
-    # --- Step 4: Rotation matrix inertial -> body
-    R_nb = np.column_stack((X_body, Y_body, Z_body))  # Columns: [X Y Z]
-    # --- Step 5: Transform velocities into body frame
-    v_kite_body = R_nb.T @ v_kite_global_i
-    v_wind_body = R_nb.T @ v_windglobal_i
-    v_apparent = v_kite_body - v_wind_body
-
-    airspeed = np.linalg.norm(v_apparent)
-    awa_rad = np.arctan2(v_apparent[2], v_apparent[0])  # AoA = Z over X
-    awa_deg = np.degrees(awa_rad)
-
-    # Store results
-    airspeeds.append(airspeed)
-    apparent_wind_angle_deg.append(awa_deg)
-    v_body_x.append(v_kite_body[0])
-    v_body_y.append(v_kite_body[1])
-    v_body_z.append(v_kite_body[2])
-
-
-# Convert lists to arrays for later use
-airspeeds = np.array(airspeeds)
-apparent_wind_angle_deg = np.array(apparent_wind_angle_deg)
-v_body_x = np.array(v_body_x)
-v_body_y = np.array(v_body_y)
-v_body_z = np.array(v_body_z)
+results_turb = compute_aerodynamics(
+    t, x, y, z, v_global, samples,
+    U_mean=8.5, rho=1.225, A=2.982, CD0=0.004, a=0.008,
+    DY=7.5, DZ=7.5, Ny=Ny, Nz=Nz,
+    pitch_reference=pitch_deg  
+)
 
 
 # --- Plotting ---
 
+#Turbulence Sampled
 plt.figure(figsize=(10, 5))
 plt.plot(t, samples[:, 0], label='u')
 plt.plot(t, samples[:, 1], label='v')
@@ -205,20 +204,18 @@ plt.grid(True)
 plt.tight_layout()
 plt.savefig('turbulence_experienced.pdf')
 
+#Visualising Helix in Box
 fig = plt.figure(figsize=(10, 6))
 ax = fig.add_subplot(111, projection='3d')
 ax.plot(x, y, z, color='purple', linewidth=2)
 ax.scatter(x[0], y[0], z[0], color='green', s=60, label='Start')
 ax.scatter(x[-1], y[-1], z[-1], color='red', s=60, label='End')
-
 box_x = Nx * 0.3632
 box_y = Ny * 7.5
 box_z = Nz * 7.5
-
 ax.set_xlim(0, box_x)
 ax.set_ylim(0, box_y)
 ax.set_zlim(0, box_z)
-
 ax.set_xlabel('X [m]', fontsize=16)
 ax.set_ylabel('Y [m]', fontsize=16)
 ax.set_zlabel('Z [m]', fontsize=16)
@@ -234,8 +231,8 @@ ax.legend(fontsize=16)
 plt.tight_layout()
 plt.savefig('Helical_path_physical_units.pdf')
 
+#Circumferential Angle
 plt.figure(figsize=(10, 5))
-plt.plot(t, gamma_deg, label='Tilt angle γ [deg]')
 plt.plot(t, phi_deg, label='Circumferential angle φ [deg]')
 plt.xlabel('Time [s]', fontsize=16)
 plt.ylabel('Angle [deg]', fontsize=16)
@@ -244,36 +241,43 @@ plt.grid(True)
 plt.tight_layout()
 plt.savefig('angles_gamma_phi.pdf')
 
+#Airspeed
 plt.figure(figsize=(10, 5))
-plt.plot(t[1:-1], airspeeds[1:-1], label='Airspeed [m/s]', color='blue')
+plt.plot(t, results_noturb['airspeed'], label='Airspeed without turbulence', color='blue')
+plt.plot(t, results_turb['airspeed'], label='Airspeed with turbulence', color='orange', alpha=0.7)
 plt.xlabel('Time [s]', fontsize=16)
-plt.ylabel('Value', fontsize=16)
+plt.ylabel('Airspeed [m/s]', fontsize=16)
+plt.title('Airspeed Comparison', fontsize=16)
 plt.legend(fontsize=14)
 plt.grid(True)
 plt.tight_layout()
 
+#Apparent Wind Angle
 plt.figure(figsize=(10, 5))
-plt.plot(t[1:-1], apparent_wind_angle_deg[1:-1], label='Apparent Wind Angle [deg]', color='orange')
+plt.plot(t, results_noturb['awa_deg'], label='AWA without turbulence', color='green')
+plt.plot(t, results_turb['awa_deg'], label='AWA with turbulence', color='red', alpha=0.7)
 plt.xlabel('Time [s]', fontsize=16)
-plt.ylabel('Value', fontsize=16)
+plt.ylabel('Apparent Wind Angle [deg]', fontsize=16)
+plt.title('Apparent Wind Angle Comparison', fontsize=16)
 plt.legend(fontsize=14)
 plt.grid(True)
 plt.tight_layout()
-plt.savefig('aoa_crossproductmatrix.pdf')
 
 
-# Plot Body Frame velocity components
-plt.figure(figsize=(10, 6))
-plt.plot(t, v_body_x, label='v_x (Body Frame)', color='blue')
-plt.plot(t, v_body_y, label='v_y (Body Frame)', color='orange')
-plt.plot(t, v_body_z, label='v_z (Body Frame)', color='green')
-plt.xlabel('Time [s]')
-plt.ylabel('Velocity [m/s]')
-plt.title('Velocity Components in the Body Frame')
-plt.legend()
+# AoA Comparison Plot
+plt.figure(figsize=(10, 5))
+plt.plot(t, results_noturb['aoa_deg'], label='AoA without turbulence', color='purple')
+plt.plot(t, results_turb['aoa_deg'], label='AoA with turbulence', color='brown', alpha=0.7)
+plt.xlabel('Time [s]', fontsize=16)
+plt.ylabel('Angle of Attack [deg]', fontsize=16)
+plt.title('Angle of Attack (AoA) Comparison', fontsize=16)
+plt.legend(fontsize=14)
 plt.grid(True)
 plt.tight_layout()
 
+
+
+# Plot Helix Frame velocity components
 plt.figure(figsize=(10, 5))
 plt.plot(t, dx, label='vx [m/s]')
 plt.plot(t, dy, label='vy [m/s]')
@@ -284,5 +288,42 @@ plt.title("Kite Velocity Components in Global Frame", fontsize=16)
 plt.legend(fontsize=14)
 plt.grid(True)
 plt.tight_layout()
+
+# --- Lift Comparison ---
+plt.figure(figsize=(10, 5))
+plt.plot(t, results_noturb['lift'], label='Lift without turbulence', color='blue')
+plt.plot(t, results_turb['lift'], label='Lift with turbulence', color='orange', alpha=0.7)
+plt.xlabel('Time [s]', fontsize=16)
+plt.ylabel('Lift [N]', fontsize=16)
+plt.title('Lift Force Comparison', fontsize=16)
+plt.legend(fontsize=14)
+plt.grid(True)
+plt.tight_layout()
+#plt.savefig('lift_comparison.pdf')
+
+# --- Drag Comparison ---
+plt.figure(figsize=(10, 5))
+plt.plot(t, results_noturb['drag'], label='Drag without turbulence', color='blue')
+plt.plot(t, results_turb['drag'], label='Drag with turbulence', color='orange', alpha=0.7)
+plt.xlabel('Time [s]', fontsize=16)
+plt.ylabel('Drag [N]', fontsize=16)
+plt.title('Drag Force Comparison', fontsize=16)
+plt.legend(fontsize=14)
+plt.grid(True)
+plt.tight_layout()
+#plt.savefig('drag_comparison.pdf')
+
+# --- Total Aerodynamic Force Comparison ---
+plt.figure(figsize=(10, 5))
+plt.plot(t, results_noturb['F_aero'], label='F_aero without turbulence', color='blue')
+plt.plot(t, results_turb['F_aero'], label='F_aero with turbulence', color='orange', alpha=0.7)
+plt.xlabel('Time [s]', fontsize=16)
+plt.ylabel('F_aero [N]', fontsize=16)
+plt.title('Total Aerodynamic Force Comparison', fontsize=16)
+plt.legend(fontsize=14)
+plt.grid(True)
+plt.tight_layout()
+#plt.savefig('f_aero_comparison.pdf')
+
 plt.show()
 
