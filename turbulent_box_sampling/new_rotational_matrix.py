@@ -2,18 +2,50 @@ import numpy as np
 from scipy.ndimage import map_coordinates
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+from hipersim import MannTurbulenceField
 
+#Buckle your seatbelts, we're in for a bumpy ride!!!
 # --- Load turbulence data ---
-file_u = r"C:\Users\markj\OneDrive - KTH\DTU 2024-2025\Master thesis\Code\turbulent_box_generation_example\constrained_box_shearShifted_wind_speed_8.5_event_200907211500_seed_1000_1000_u.bin.ref"
-file_v = r"C:\Users\markj\OneDrive - KTH\DTU 2024-2025\Master thesis\Code\turbulent_box_generation_example\constrained_box_shearShifted_wind_speed_8.5_event_200907211500_seed_1000_1000_v.bin.ref"
-file_w = r"C:\Users\markj\OneDrive - KTH\DTU 2024-2025\Master thesis\Code\turbulent_box_generation_example\constrained_box_shearShifted_wind_speed_8.5_event_200907211500_seed_1000_1000_w.bin.ref"
+#file_u = r"C:\Users\markj\OneDrive - KTH\DTU 2024-2025\Master thesis\Code\turbulent_box_generation_example\constrained_box_shearShifted_wind_speed_8.5_event_200907211500_seed_1000_1000_u.bin.ref"
+#file_v = r"C:\Users\markj\OneDrive - KTH\DTU 2024-2025\Master thesis\Code\turbulent_box_generation_example\constrained_box_shearShifted_wind_speed_8.5_event_200907211500_seed_1000_1000_v.bin.ref"
+#file_w = r"C:\Users\markj\OneDrive - KTH\DTU 2024-2025\Master thesis\Code\turbulent_box_generation_example\constrained_box_shearShifted_wind_speed_8.5_event_200907211500_seed_1000_1000_w.bin.ref"
+#data_u = np.fromfile(file_u, dtype=np.float32).reshape((16384, 32, 32))
+#data_v = np.fromfile(file_v, dtype=np.float32).reshape((16384, 32, 32))
+#data_w = np.fromfile(file_w, dtype=np.float32).reshape((16384, 32, 32))
+#Nx, Ny, Nz = data_u.shape
+#print("Data Shape (u, v, w):", data_u.shape, data_v.shape, data_w.shape)
 
-data_u = np.fromfile(file_u, dtype=np.float32).reshape((16384, 32, 32))
-data_v = np.fromfile(file_v, dtype=np.float32).reshape((16384, 32, 32))
-data_w = np.fromfile(file_w, dtype=np.float32).reshape((16384, 32, 32))
 
+
+#---Generate Turbulence Data---
+def generate_mann_box(U_mean=8.5, desired_TI=0.1,
+                      alphaepsilon=0.017791195, L=81.63659348, Gamma=1.078049616,
+                      Nxyz=(16384, 32, 32), dxyz=(0.3632, 7.5, 7.5), seed=1):
+
+    mtf = MannTurbulenceField.generate(alphaepsilon=alphaepsilon,
+                                       L=L,
+                                       Gamma=Gamma,
+                                       Nxyz=Nxyz,
+                                       dxyz=dxyz,
+                                       seed=seed,
+                                       HighFreqComp=0,
+                                       double_xyz=(False, True, True))
+    u, v, w = mtf.uvw
+
+    print(mtf.spectrum_TI(U=U_mean))
+ 
+    # Compute and apply TI scaling
+    #initial_TI = u.std(0).mean() / U_mean
+    #scaling_factor = desired_TI / initial_TI
+    #u *= scaling_factor
+    #v *= scaling_factor
+    #w *= scaling_factor
+    return u, v, w, dxyz
+
+data_u, data_v, data_w, (DX, DY, DZ) = generate_mann_box(U_mean=8.5, desired_TI=0.1)
 Nx, Ny, Nz = data_u.shape
 print("Data Shape (u, v, w):", data_u.shape, data_v.shape, data_w.shape)
+
 
 # --- FUNCTIONS ---
 
