@@ -6,6 +6,13 @@ from hipersim import MannTurbulenceField
 import os
 import pandas as pd
 
+#Define Mann Parameters
+U_mean = 15.5 #CHANGE SAVE FIG NAME
+desired_TI = 0.1
+alpha_epsilon = 0.0718741047377661
+L = 66.35046795800946
+Gamma = 2.4268213212433256
+
 #Buckle your seatbelts, we're in for a bumpy ride!!!
 # --- Load turbulence data ---
 #file_u = r"C:\Users\markj\OneDrive - KTH\DTU 2024-2025\Master thesis\Code\turbulent_box_generation_example\constrained_box_shearShifted_wind_speed_8.5_event_200907211500_seed_1000_1000_u.bin.ref"
@@ -18,10 +25,9 @@ import pandas as pd
 #print("Data Shape (u, v, w):", data_u.shape, data_v.shape, data_w.shape)
 
 
-
 #---Generate Turbulence Data---
-def generate_mann_box(U_mean=8.5, desired_TI=0.1,
-                      alphaepsilon=0.017791195, L=81.63659348, Gamma=1.078049616,
+def generate_mann_box(U_mean, desired_TI,
+                      alphaepsilon, L, Gamma,
                       Nxyz=(16384, 32, 32), dxyz=(0.3632, 7.5, 7.5), seed=1):
 
     mtf = MannTurbulenceField.generate(alphaepsilon=alphaepsilon,
@@ -109,7 +115,7 @@ def process_files_in_directory(directory, output_file="mann_TI_summary.txt"):
     #process_files_in_directory(folder_path, output_summary_file) 
 
 
-data_u, data_v, data_w, (DX, DY, DZ) = generate_mann_box(U_mean=8.5, desired_TI=0.1)
+data_u, data_v, data_w, (DX, DY, DZ) = generate_mann_box(U_mean, desired_TI, alpha_epsilon, L, Gamma )
 Nx, Ny, Nz = data_u.shape
 print("Data Shape (u, v, w):", data_u.shape, data_v.shape, data_w.shape)
 
@@ -159,6 +165,8 @@ def compute_aerodynamics(t, x, y, z, v_global, samples,
     drag = []
     F_aero = []
     aoa_deg_corrected = []
+    lift_coeff = []
+    drag_coeff = []
 
     v_body_x = []
     v_body_y = []
@@ -204,10 +212,13 @@ def compute_aerodynamics(t, x, y, z, v_global, samples,
         # Aerodynamics
         C_L = 2 * np.pi * aoa_rad
         C_D_airfoil = CD0 + a * C_L**2
+        #C_D_tether = C_perp * (d_tether * L_tether) / (4 * A_tether)
+        C_D_tether = 0
+        C_D_total = C_D_airfoil + C_D_tether
         q = 0.5 * rho * airspeed**2
 
         L = q * A * C_L
-        D = q * A * C_D_airfoil
+        D = q * A * C_D_total
         F_a = np.sqrt(L**2 + D**2)
 
         # Store
@@ -235,7 +246,7 @@ def compute_aerodynamics(t, x, y, z, v_global, samples,
 
 # --- Sampling  of Turbulence Field ---
 samples, coords_grid, coords_phys = helical_sample_velocity_field_physical_moving_box(
-    data_u, data_v, data_w, U_box = 8.5,
+    data_u, data_v, data_w, U_box = U_mean,
     radius_m=60,
     T_loop=10,
     total_time=330,
@@ -271,7 +282,7 @@ phi_deg = np.degrees(phi_rad)
 #---Calculate Aero parameters for steady & unsteady wind---
 results_noturb = compute_aerodynamics(
     t, x, y, z, v_global, samples_noturb,
-    U_mean=8.5, rho=1.225, A=2.982, CD0=0.004, a=0.008,
+    U_mean, rho=1.225, A=2.982, CD0=0.004, a=0.008,
     DY=7.5, DZ=7.5, Ny=Ny, Nz=Nz,
     fix_aoa_deg=6.0  
 )
@@ -281,7 +292,7 @@ print(pitch_deg)
 
 results_turb = compute_aerodynamics(
     t, x, y, z, v_global, samples,
-    U_mean=8.5, rho=1.225, A=2.982, CD0=0.004, a=0.008,
+    U_mean, rho=1.225, A=2.982, CD0=0.004, a=0.008,
     DY=7.5, DZ=7.5, Ny=Ny, Nz=Nz,
     pitch_reference=pitch_deg  
 )
@@ -291,6 +302,7 @@ results_turb = compute_aerodynamics(
 
 #Turbulence Sampled
 plt.figure(figsize=(10, 5))
+plt.style.use('tableau-colorblind10')
 plt.plot(t, samples[:, 0], label='u')
 plt.plot(t, samples[:, 1], label='v')
 plt.plot(t, samples[:, 2], label='w')
@@ -301,7 +313,7 @@ plt.yticks(fontsize=14)
 plt.legend(fontsize=14)
 plt.grid(True)
 plt.tight_layout()
-plt.savefig('turbulence_experienced.pdf')
+#plt.savefig('turbulence_experienced.pdf')
 
 #Visualising Helix in Box
 fig = plt.figure(figsize=(10, 6))
@@ -328,36 +340,43 @@ ax.yaxis._axinfo['grid'].update(color='lightgray', linestyle='--')
 ax.zaxis._axinfo['grid'].update(color='lightgray', linestyle='--')
 ax.legend(fontsize=16)
 plt.tight_layout()
-plt.savefig('Helical_path_physical_units.pdf')
+#plt.savefig('Helical_path_physical_units.pdf')
 
 #Circumferential Angle
 plt.figure(figsize=(10, 5))
+plt.style.use('tableau-colorblind10')
 plt.plot(t, phi_deg, label='Circumferential angle φ [deg]')
 plt.xlabel('Time [s]', fontsize=16)
 plt.ylabel('Angle [deg]', fontsize=16)
 plt.legend(fontsize=14)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
 plt.grid(True)
 plt.tight_layout()
-plt.savefig('angles_gamma_phi.pdf')
+#plt.savefig('angles_gamma_phi.pdf')
 
 #Airspeed
 plt.figure(figsize=(10, 5))
-plt.plot(t, results_noturb['airspeed'], label='Airspeed without turbulence', color='blue')
-plt.plot(t, results_turb['airspeed'], label='Airspeed with turbulence', color='orange', alpha=0.7)
+plt.style.use('tableau-colorblind10')
+plt.plot(t, results_noturb['airspeed'], label='Steady')
+plt.plot(t, results_turb['airspeed'], label='Unsteady', alpha=0.7)
 plt.xlabel('Time [s]', fontsize=16)
 plt.ylabel('Airspeed [m/s]', fontsize=16)
-plt.title('Airspeed Comparison', fontsize=16)
 plt.legend(fontsize=14)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
 plt.grid(True)
 plt.tight_layout()
 
 #Apparent Wind Angle
 plt.figure(figsize=(10, 5))
-plt.plot(t, results_noturb['awa_deg'], label='AWA without turbulence', color='green')
-plt.plot(t, results_turb['awa_deg'], label='AWA with turbulence', color='red', alpha=0.7)
+plt.style.use('tableau-colorblind10')
+plt.plot(t, results_noturb['awa_deg'], label='Steady')
+plt.plot(t, results_turb['awa_deg'], label='Unsteady', alpha=0.7)
 plt.xlabel('Time [s]', fontsize=16)
 plt.ylabel('Apparent Wind Angle [deg]', fontsize=16)
-plt.title('Apparent Wind Angle Comparison', fontsize=16)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
 plt.legend(fontsize=14)
 plt.grid(True)
 plt.tight_layout()
@@ -365,64 +384,92 @@ plt.tight_layout()
 
 # AoA Comparison Plot
 plt.figure(figsize=(10, 5))
-plt.plot(t, results_noturb['aoa_deg'], label='AoA without turbulence', color='purple')
-plt.plot(t, results_turb['aoa_deg'], label='AoA with turbulence', color='brown', alpha=0.7)
+plt.style.use('tableau-colorblind10')
+plt.plot(t, results_noturb['aoa_deg'], label='Steady')
+plt.plot(t, results_turb['aoa_deg'], label='Unsteady', alpha=0.7)
 plt.xlabel('Time [s]', fontsize=16)
 plt.ylabel('Angle of Attack [deg]', fontsize=16)
-plt.title('Angle of Attack (AoA) Comparison', fontsize=16)
 plt.legend(fontsize=14)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
 plt.grid(True)
 plt.tight_layout()
+plt.savefig('aoa_15.5_comparison.pdf')
 
 
 
 # Plot Helix Frame velocity components
 plt.figure(figsize=(10, 5))
+plt.style.use('tableau-colorblind10')
 plt.plot(t, dx, label='vx [m/s]')
 plt.plot(t, dy, label='vy [m/s]')
 plt.plot(t, dz, label='vz [m/s]')
 plt.xlabel('Time [s]', fontsize=16)
 plt.ylabel('Velocity [m/s]', fontsize=16)
-plt.title("Kite Velocity Components in Global Frame", fontsize=16)
 plt.legend(fontsize=14)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
 plt.grid(True)
 plt.tight_layout()
 
 # --- Lift Comparison ---
 plt.figure(figsize=(10, 5))
-plt.plot(t, results_noturb['lift'], label='Lift without turbulence', color='blue')
-plt.plot(t, results_turb['lift'], label='Lift with turbulence', color='orange', alpha=0.7)
+plt.style.use('tableau-colorblind10')
+plt.plot(t, results_noturb['lift'], label='Steady')
+plt.plot(t, results_turb['lift'], label='Unsteady', alpha=0.7)
 plt.xlabel('Time [s]', fontsize=16)
 plt.ylabel('Lift [N]', fontsize=16)
-plt.title('Lift Force Comparison', fontsize=16)
 plt.legend(fontsize=14)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
 plt.grid(True)
 plt.tight_layout()
-#plt.savefig('lift_comparison.pdf')
+plt.savefig('lift_comparison_15.5.pdf')
 
 # --- Drag Comparison ---
 plt.figure(figsize=(10, 5))
-plt.plot(t, results_noturb['drag'], label='Drag without turbulence', color='blue')
-plt.plot(t, results_turb['drag'], label='Drag with turbulence', color='orange', alpha=0.7)
+plt.style.use('tableau-colorblind10')
+plt.plot(t, results_noturb['drag'], label='Steady')
+plt.plot(t, results_turb['drag'], label='Unsteady', alpha=0.7)
 plt.xlabel('Time [s]', fontsize=16)
 plt.ylabel('Drag [N]', fontsize=16)
-plt.title('Drag Force Comparison', fontsize=16)
 plt.legend(fontsize=14)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
 plt.grid(True)
 plt.tight_layout()
-#plt.savefig('drag_comparison.pdf')
+plt.savefig('drag_comparison_15.5.pdf')
+
+#Find lift drag ratio
+"""plt.figure(figsize=(10, 5))
+plt.style.use('tableau-colorblind10')
+ld_ratio_noturb = results_noturb['C_L'] / results_noturb['C_D']
+ld_ratio_turb = results_turb['C_L'] / results_turb['C_D']
+plt.plot(t, ld_ratio_noturb, label='Steady')  # Nice blue
+plt.plot(t, ld_ratio_turb, label='Unsteady', alpha=0.7)  # Light pink
+plt.xlabel('Time [s]', fontsize=16)
+plt.ylabel('Lift-to-Drag Ratio [-]', fontsize=16)
+plt.legend(fontsize=14)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+plt.grid(True)
+plt.tight_layout()"""
+# plt.savefig('lift_drag_ratio_comparison.pdf')
+
 
 # --- Total Aerodynamic Force Comparison ---
 plt.figure(figsize=(10, 5))
-plt.plot(t, results_noturb['F_aero'], label='F_aero without turbulence', color='blue')
-plt.plot(t, results_turb['F_aero'], label='F_aero with turbulence', color='orange', alpha=0.7)
+plt.style.use('tableau-colorblind10')
+plt.plot(t, results_noturb['F_aero'], label='Steady')
+plt.plot(t, results_turb['F_aero'], label='Unsteady', alpha=0.7)
 plt.xlabel('Time [s]', fontsize=16)
-plt.ylabel('F_aero [N]', fontsize=16)
-plt.title('Total Aerodynamic Force Comparison', fontsize=16)
+plt.ylabel(r'$F_{\mathrm{aero}}$ [N]', fontsize=16)
 plt.legend(fontsize=14)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
 plt.grid(True)
 plt.tight_layout()
-#plt.savefig('f_aero_comparison.pdf')
+plt.savefig('f_aero_comparison_15.5.pdf')
 
 plt.show()
 
