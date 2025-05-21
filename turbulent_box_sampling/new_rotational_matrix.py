@@ -7,11 +7,12 @@ import os
 import pandas as pd
 
 #Define Mann Parameters
-U_mean = 15.5 #CHANGE SAVE FIG NAME
+U_mean = 12.5 #CHANGE SAVE FIG NAME
 desired_TI = 0.1
-alpha_epsilon = 0.0718741047377661
-L = 66.35046795800946
-Gamma = 2.4268213212433256
+alpha_epsilon = 0.0456825588131349
+L = 68.05627895300304
+Gamma = 2.438897937014391
+sim_time = 300
 
 #Buckle your seatbelts, we're in for a bumpy ride!!!
 # --- Load turbulence data ---
@@ -125,7 +126,7 @@ print("Data Shape (u, v, w):", data_u.shape, data_v.shape, data_w.shape)
 # Samples a turbulent velocity field along a helical trajectory through a moving wind box
 def helical_sample_velocity_field_physical_moving_box(data_u, data_v, data_w,
                                                       U_box, radius_m=60, T_loop=10, 
-                                                      total_time=100, DX=0.3632, DY=7.5, DZ=7.5):
+                                                      total_time=300, DX=0.3632, DY=7.5, DZ=7.5):
 
     Nx, Ny, Nz = data_u.shape
     U_kite_box = 1/3 * U_box
@@ -134,6 +135,8 @@ def helical_sample_velocity_field_physical_moving_box(data_u, data_v, data_w,
     t = np.linspace(0, total_time, n_samples)
    
     x_phys = (U_box + U_kite_box) * t
+    
+
     y_phys = radius_m * np.cos(2 * np.pi * t / T_loop)
     z_phys = radius_m * np.sin(2 * np.pi * t / T_loop)
 
@@ -164,6 +167,7 @@ def compute_aerodynamics(t, x, y, z, v_global, samples,
     lift = []
     drag = []
     F_aero = []
+    F_aero_vec_list = []
     aoa_deg_corrected = []
     lift_coeff = []
     drag_coeff = []
@@ -215,10 +219,22 @@ def compute_aerodynamics(t, x, y, z, v_global, samples,
         #C_D_tether = C_perp * (d_tether * L_tether) / (4 * A_tether)
         C_D_tether = 0
         C_D_total = C_D_airfoil + C_D_tether
+       
+        #Magnitude of Lift & Drag
         q = 0.5 * rho * airspeed**2
-
         L = q * A * C_L
         D = q * A * C_D_total
+
+        #Lift and Drag Vector 
+        v_apparent_unit = v_apparent / airspeed
+        drag_vec = -v_apparent_unit
+        lift_dir = np.cross(drag_vec, Y_body)
+        lift_dir /= np.linalg.norm(lift_dir)
+        lift_vec = L * lift_dir
+        drag_vec = D * drag_vec
+
+        #Aerodynamic force vector and mag
+        F_aero_vec = lift_vec + drag_vec
         F_a = np.sqrt(L**2 + D**2)
 
         # Store
@@ -228,6 +244,7 @@ def compute_aerodynamics(t, x, y, z, v_global, samples,
         lift.append(L)
         drag.append(D)
         F_aero.append(F_a)
+        F_aero_vec_list.append(F_aero_vec)
         v_body_x.append(v_kite_body[0])
         v_body_y.append(v_kite_body[1])
         v_body_z.append(v_kite_body[2])
@@ -239,6 +256,7 @@ def compute_aerodynamics(t, x, y, z, v_global, samples,
         'lift': np.array(lift),
         'drag': np.array(drag),
         'F_aero': np.array(F_aero),
+        'F_aero_vec': np.array(F_aero_vec_list),
         'v_body': np.vstack((v_body_x, v_body_y, v_body_z)).T
     }
 
@@ -249,7 +267,7 @@ samples, coords_grid, coords_phys = helical_sample_velocity_field_physical_movin
     data_u, data_v, data_w, U_box = U_mean,
     radius_m=60,
     T_loop=10,
-    total_time=330,
+    total_time=300,
     DX=0.3632, DY=7.5, DZ=7.5
 )
 
@@ -258,6 +276,7 @@ samples_noturb = np.zeros_like(samples)
 dt = 0.1
 t = np.linspace(0, dt * len(samples), len(samples), endpoint=False)
 x, y, z = coords_phys[:, 0], coords_phys[:, 1], coords_phys[:, 2]
+
 
 # --- Compute velocity and acceleration ---
 dx = np.gradient(x, dt)
@@ -394,7 +413,9 @@ plt.xticks(fontsize=14)
 plt.yticks(fontsize=14)
 plt.grid(True)
 plt.tight_layout()
-plt.savefig('aoa_15.5_comparison.pdf')
+plt.savefig('aoa_9.5_comparison.png')
+
+
 
 
 
@@ -424,7 +445,7 @@ plt.xticks(fontsize=14)
 plt.yticks(fontsize=14)
 plt.grid(True)
 plt.tight_layout()
-plt.savefig('lift_comparison_15.5.pdf')
+#plt.savefig('lift_comparison_15.5.pdf')
 
 # --- Drag Comparison ---
 plt.figure(figsize=(10, 5))
@@ -438,23 +459,23 @@ plt.xticks(fontsize=14)
 plt.yticks(fontsize=14)
 plt.grid(True)
 plt.tight_layout()
-plt.savefig('drag_comparison_15.5.pdf')
+#plt.savefig('drag_comparison_15.5.pdf')
 
 #Find lift drag ratio
-"""plt.figure(figsize=(10, 5))
+plt.figure(figsize=(10, 5))
 plt.style.use('tableau-colorblind10')
-ld_ratio_noturb = results_noturb['C_L'] / results_noturb['C_D']
-ld_ratio_turb = results_turb['C_L'] / results_turb['C_D']
+ld_ratio_noturb = results_noturb['lift'] / results_noturb['drag']
+ld_ratio_turb = results_turb['lift'] / results_turb['drag']
 plt.plot(t, ld_ratio_noturb, label='Steady')  # Nice blue
 plt.plot(t, ld_ratio_turb, label='Unsteady', alpha=0.7)  # Light pink
 plt.xlabel('Time [s]', fontsize=16)
-plt.ylabel('Lift-to-Drag Ratio [-]', fontsize=16)
+plt.ylabel('L/D [-]', fontsize=16)
 plt.legend(fontsize=14)
 plt.xticks(fontsize=14)
 plt.yticks(fontsize=14)
 plt.grid(True)
-plt.tight_layout()"""
-# plt.savefig('lift_drag_ratio_comparison.pdf')
+plt.tight_layout()
+plt.savefig('lift_drag_ratio_comparison_9.5.png')
 
 
 # --- Total Aerodynamic Force Comparison ---
@@ -469,7 +490,20 @@ plt.xticks(fontsize=14)
 plt.yticks(fontsize=14)
 plt.grid(True)
 plt.tight_layout()
-plt.savefig('f_aero_comparison_15.5.pdf')
+#plt.savefig('f_aero_comparison_9.5.png')
+
+# --- Aerodynamic Force Vectors in Body Frame Turbulence ---
+plt.figure(figsize=(10, 5))
+plt.plot(t, results_turb['F_aero_vec'][:, 0], label='F_x (Body X)')
+plt.plot(t, results_turb['F_aero_vec'][:, 1], label='F_y (Body Y)')
+plt.plot(t, results_turb['F_aero_vec'][:, 2], label='F_z (Body Z)')
+plt.xlabel('Time [s]', fontsize=16)
+plt.ylabel(r'$F_{\mathrm{aero}}$ [N]', fontsize=16)
+plt.legend(fontsize=14)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+plt.grid(True)
+plt.tight_layout()
 
 plt.show()
 
