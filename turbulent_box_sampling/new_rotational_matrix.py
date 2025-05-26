@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from hipersim import MannTurbulenceField
 import pandas as pd
+from scipy.signal import coherence
 
 #Import function files
 from functions_spectrum import *
@@ -13,10 +14,10 @@ from sampling_functions import *
 from aerodynamics_functions import *
 
 #Define Mann Parameters & Simulation time
-U_mean = 9.5 #CHANGE SAVE FIG NAME
-alpha_epsilon = 0.023132626456368
-L = 37.38544456749976
-Gamma = 3.8408936134736287
+U_mean = 12.5 #CHANGE SAVE FIG NAME
+alpha_epsilon = 0.0456825588131349
+L = 68.05627895300304		
+Gamma = 2.438897937014391
 desired_TI = 0.1
 sim_time = 300
 dt = 0.1
@@ -63,6 +64,33 @@ samples_linear, coords_grid_linear, coords_phys_linear = linear_sample_velocity_
     total_time=300,
     DX=0.3632, DY=7.5, DZ=7.5)
 
+# Extract components from helical sampling
+u_h = samples[:, 0]
+v_h = samples[:, 1]
+w_h = samples[:, 2]
+
+# Extract components from centreline sampling
+u_l = samples_linear[:, 0]
+v_l = samples_linear[:, 1]
+w_l = samples_linear[:, 2]
+
+# Calculate mean and standard deviation for each
+def describe_component(name, data):
+    mean = np.mean(data)
+    std = np.std(data)
+    print(f"{name}: Mean = {mean:.4f}, Std Dev = {std:.4f}")
+    return mean, std
+
+print("Helical Sampling:")
+describe_component("u_h", u_h)
+describe_component("v_h", v_h)
+describe_component("w_h", w_h)
+
+print("\nCentreline Sampling:")
+describe_component("u_l", u_l)
+describe_component("v_l", v_l)
+describe_component("w_l", w_l)
+
 #Create an array for no turbulence Case
 samples_noturb = np.zeros_like(samples)
 
@@ -98,15 +126,23 @@ fs = 1 / dt  # Sampling frequency = 10 Hz
 psd_helical = compute_psd_all_components(samples, fs)
 # For linear sampling
 psd_linear = compute_psd_all_components(samples_linear, fs)
-freqs_h, psd_h = psd_helical['u']
-freqs_l, psd_l = psd_linear['u']
-speccheck_unsmooth("Helical_sampling", samples[:,0], freqs_h, psd_h)
-speccheck_unsmooth("Linear_sampling", samples_linear[:,0], freqs_l, psd_l)
+
+#Extracting u,v,w for plotting
+freqs_h_u, psd_h_u = psd_helical['u']
+freqs_h_v, psd_h_v = psd_helical['v']
+freqs_h_w, psd_h_w = psd_helical['w']
+
+freqs_l_u, psd_l_u = psd_linear['u']
+freqs_l_v, psd_l_v = psd_linear['v']
+freqs_l_w, psd_l_w = psd_linear['w']
+
+speccheck_unsmooth("Helical_sampling", samples[:,0], freqs_h_u, psd_h_u)
+speccheck_unsmooth("Linear_sampling", samples_linear[:,0], freqs_l_u, psd_l_u)
 
 # Smoothing
 n_per_decade = 20  # Set to a value between ~10 and 20 [Need to look at how much I want to smooth]
-smoothed_freqs_helical, smoothed_spectrum_helical = smooth_criminal(psd_h, freqs_h, n_per_decade)
-smoothed_freqs_linear, smoothed_spectrum_linear = smooth_criminal(psd_l, freqs_l, n_per_decade)
+smoothed_freqs_helical, smoothed_spectrum_helical = smooth_criminal(psd_h_u, freqs_h_u, n_per_decade)
+smoothed_freqs_linear, smoothed_spectrum_linear = smooth_criminal(psd_l_u, freqs_l_u, n_per_decade)
 
 
 
@@ -128,7 +164,32 @@ results_turb = compute_aerodynamics(
     pitch_reference=pitch_deg  
 )
 
+#Find number of exceedances
+events = find_aoa_exceedances(results_turb['aoa_deg'], dt, threshold = 10, min_duration = 1)
+
+for idx, (start, end) in enumerate(events):
+    print(f"Event {idx+1}: AoA > 10 degrees from {start:.2f}s to {end:.2f}s (duration {end-start:.2f}s)")
+
 # --- Plotting ---
+nperseg = 256
+f_u, coh_u = coherence(u_h, u_l, fs=fs, nperseg=nperseg)
+f_v, coh_v = coherence(v_h, u_l, fs=fs, nperseg=nperseg)
+f_w, coh_w = coherence(w_h, w_l, fs=fs, nperseg=nperseg)
+
+plt.figure(figsize=(10, 5))
+plt.style.use('tableau-colorblind10')
+plt.semilogx(f_u, coh_u, label='u')
+plt.semilogx(f_v, coh_v, label='v')
+plt.semilogx(f_w, coh_w, label='w')
+plt.xlabel('Frequency [Hz]', fontsize = 16)
+plt.ylabel('Coherence', fontsize = 16)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+plt.legend(fontsize=14)
+plt.grid(True, linestyle=':', alpha=0.7, color='gray')
+plt.tight_layout()
+#plt.savefig('coherences_sampling_method.pdf')
+
 
 #Turbulence Sampled Helix
 plt.figure(figsize=(10, 5))
@@ -141,8 +202,10 @@ plt.ylabel('Velocity [m/s]', fontsize=16)
 plt.xticks(fontsize=14)
 plt.yticks(fontsize=14)
 plt.legend(fontsize=14)
-plt.grid(True)
+plt.grid(True, linestyle=':', alpha=0.7, color='gray')
 plt.tight_layout()
+#plt.savefig('turbulence_experienced_helical.pdf')
+
 
 #Turbulence Sampled linear
 plt.figure(figsize=(10, 5))
@@ -155,18 +218,80 @@ plt.ylabel('Velocity [m/s]', fontsize=16)
 plt.xticks(fontsize=14)
 plt.yticks(fontsize=14)
 plt.legend(fontsize=14)
-plt.grid(True)
-plt.title('linear')
+plt.grid(True, linestyle=':', alpha=0.7, color='gray')
 plt.tight_layout()
-#plt.savefig('turbulence_experienced.pdf')
+#plt.savefig('turbulence_experienced_linear.pdf')
+"""
+# Choose the slice at y=0
+y_index = 0
+
+# Get the 2D slice: u(x, z) at y=0
+u_slice = data_u[:, y_index, :]  # shape: (Nx, Nz)
+
+# Calculate physical axes in meters
+DX = 0.3632  # your grid spacing in x (meters)
+DZ = 7.5     # your grid spacing in z (meters)
+x_meters = np.arange(u_slice.shape[0]) * DX
+z_meters = np.arange(u_slice.shape[1]) * DZ
+# Plot the heatmap with red-white-blue colormap
+plt.figure(figsize=(10, 5))
+plt.imshow(
+    u_slice.T,
+    aspect='auto',
+    origin='lower',
+    cmap='bwr',
+    extent=[x_meters[0], x_meters[-1], z_meters[0], z_meters[-1]],
+    interpolation='nearest'
+)
+cbar = plt.colorbar()
+cbar.set_label('u [m/s]', fontsize=14)
+plt.xlabel('x [m]', fontsize=14)
+plt.ylabel('z [m]', fontsize=14)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+plt.title("y = 0, uvw = 'u'", fontsize=16)
+plt.grid(False)
+plt.tight_layout()
+plt.savefig('turbulence_box_slice.pdf')"""
+
 
 #PSD
 plt.figure(figsize=(10,5))
-plt.loglog(freqs_h, freqs_h*psd_h, label='Helical u')
-plt.loglog(freqs_l, freqs_l*psd_l, label='Linear u')
-plt.xlabel('Frequency [Hz]')
-plt.ylabel('Power Spectral Density')
-plt.legend()
+plt.loglog(freqs_h_u, freqs_h_u*psd_h_u, label='Helical')
+plt.loglog(freqs_l_u, freqs_l_u*psd_l_u, label='Centreline')
+plt.xlabel('Frequency [Hz]', fontsize=16)
+plt.ylabel(r'$fS(f)$ [m$^2$/s$^2$]', fontsize=16)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+plt.legend(fontsize=14, loc='lower left')
+plt.grid(True, linestyle=':', alpha=0.7, color='gray')
+plt.tight_layout()
+#plt.savefig('psd_u_helvslin.pdf')
+
+plt.figure(figsize=(10,5))
+plt.loglog(freqs_h_v, freqs_h_v*psd_h_v, label='Helical')
+plt.loglog(freqs_l_v, freqs_l_v*psd_l_v, label='Centreline')
+plt.xlabel('Frequency [Hz]', fontsize=16)
+plt.ylabel(r'$fS(f)$ [m$^2$/s$^2$]', fontsize=16)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+plt.legend(fontsize=14)
+plt.grid(True, linestyle=':', alpha=0.7, color='gray')
+plt.tight_layout()
+#plt.savefig('psd_v_helvslin.pdf')
+
+plt.figure(figsize=(10,5))
+plt.loglog(freqs_h_w, freqs_h_w*psd_h_w, label='Helical')
+plt.loglog(freqs_l_w, freqs_l_w*psd_l_w, label='Centreline')
+plt.xlabel('Frequency [Hz]', fontsize=16)
+plt.ylabel(r'$fS(f)$ [m$^2$/s$^2$]', fontsize=16)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+plt.legend(fontsize=14)
+plt.grid(True, linestyle=':', alpha=0.7, color='gray')
+plt.tight_layout()
+#plt.savefig('psd_w_helvslin.pdf')
+
 
 plt.figure(figsize=(10,5))
 plt.loglog(smoothed_freqs_helical, smoothed_freqs_helical*smoothed_spectrum_helical, label='Helical u')
@@ -180,13 +305,13 @@ plt.legend()
 #Visualising Helix in Box
 fig = plt.figure(figsize=(10, 6))
 ax = fig.add_subplot(111, projection='3d')
-ax.plot(x, y, z, color='purple', linewidth=2)
-ax.scatter(x[0], y[0], z[0], color='green', s=60, label='Start')
-ax.scatter(x[-1], y[-1], z[-1], color='red', s=60, label='End')
+ax.plot(x, y, z, color='grey', linewidth=2)
+ax.scatter(x[0], y[0], z[0], color='blue', s=60, label='Start')
+ax.scatter(x[-1], y[-1], z[-1], color='orange', s=60, label='End')
 box_x = Nx * 0.3632
 box_y = Ny * 7.5
 box_z = Nz * 7.5
-ax.set_xlim(0, box_x)
+ax.set_xlim(0, box_x)  # Limit x-axis to 2000 meters)
 ax.set_ylim(0, box_y)
 ax.set_zlim(0, box_z)
 ax.set_xlabel('X [m]', fontsize=16)
@@ -256,7 +381,20 @@ plt.xticks(fontsize=14)
 plt.yticks(fontsize=14)
 plt.grid(True)
 plt.tight_layout()
-plt.savefig('aoa_9.5_comparison.png')
+#plt.savefig('aoa_9.5_comparison.png')
+
+
+plt.figure(figsize=(10,5))
+plt.plot(t, results_turb['aoa_deg'], label="Angle of Attack (deg)")
+plt.axhline(10, color='red', linestyle='--', label="10 degree threshold")
+
+for (start, end) in events:
+    plt.axvspan(start, end, color='orange', alpha=0.3)
+
+plt.xlabel("Time (s)")
+plt.ylabel("Angle of Attack (deg)")
+plt.legend()
+
 
 
 # Plot Helix Frame velocity components
@@ -315,7 +453,7 @@ plt.xticks(fontsize=14)
 plt.yticks(fontsize=14)
 plt.grid(True)
 plt.tight_layout()
-plt.savefig('lift_drag_ratio_comparison_9.5.png')
+#plt.savefig('lift_drag_ratio_comparison_9.5.png')
 
 
 # --- Total Aerodynamic Force Comparison ---
