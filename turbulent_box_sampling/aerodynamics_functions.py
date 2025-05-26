@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.ndimage import label
 
 #Computes aerodynamic forces and body-frame velocities of a kite moving through a turbulent wind field.
 def compute_aerodynamics(t, x, y, z, v_global, samples,
@@ -101,3 +102,33 @@ def compute_aerodynamics(t, x, y, z, v_global, samples,
         'F_aero_vec': np.array(F_aero_vec_list),
         'v_body': np.vstack((v_body_x, v_body_y, v_body_z)).T
     }
+
+
+
+
+def find_aoa_exceedances(aoa_deg, dt, threshold=10, min_duration=5):
+    """
+    Find time periods where AoA exceeds the threshold and lasts longer than min_duration.
+
+    Parameters:
+    - aoa_deg: numpy array of AoA in degrees
+    - dt: time step in seconds
+    - threshold: AoA threshold (default 10 degrees)
+    - min_duration: minimum duration in seconds (default 5 sec)
+
+    Returns:
+    - List of (start_time, end_time) tuples for exceedance events
+    """
+    condition = aoa_deg > threshold
+    labeled_array, num_features = label(condition)
+    
+    events = []
+    for i in range(1, num_features+1):
+        indices = np.where(labeled_array == i)[0]
+        duration = len(indices) * dt
+        if duration >= min_duration:
+            t_start = indices[0] * dt
+            t_end = indices[-1] * dt
+            events.append((t_start, t_end))
+    
+    return events
