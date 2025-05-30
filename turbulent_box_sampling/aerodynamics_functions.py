@@ -8,12 +8,15 @@ def compute_aerodynamics(t, x, y, z, v_global, samples,
     airspeeds = []
     apparent_wind_angle_deg = []
     lift = []
+    lift_vec_list =[]
     drag = []
+    drag_vec_list = []
     F_aero = []
     F_aero_vec_list = []
     aoa_deg_corrected = []
     lift_coeff = []
     drag_coeff = []
+    v_apparent_vec_list = []
 
     v_body_x = []
     v_body_y = []
@@ -39,10 +42,10 @@ def compute_aerodynamics(t, x, y, z, v_global, samples,
 
         v_kite_body = R_nb.T @ v_kite_global_i
         v_wind_body = R_nb.T @ v_windglobal_i
-        v_apparent = v_kite_body - v_wind_body
-
+        v_apparent =   v_wind_body - v_kite_body
+        
         airspeed = np.linalg.norm(v_apparent)
-        awa_rad = np.arctan2(v_apparent[2], v_apparent[0])  # AoA
+        awa_rad = np.arctan2(-v_apparent[2], -v_apparent[0])  # AoA
         awa_deg = np.degrees(awa_rad)
 
         # Default AoA = AWA if nothing fixed
@@ -68,16 +71,24 @@ def compute_aerodynamics(t, x, y, z, v_global, samples,
         L = q * A * C_L
         D = q * A * C_D_total
 
-        #Lift and Drag Vector 
-        v_apparent_unit = v_apparent / airspeed
-        drag_vec = -v_apparent_unit
-        lift_dir = np.cross(drag_vec, Y_body)
-        lift_dir /= np.linalg.norm(lift_dir)
-        lift_vec = L * lift_dir
-        drag_vec = D * drag_vec
 
-        #Aerodynamic force vector and mag
-        F_aero_vec = lift_vec + drag_vec
+
+        # Normalize drag direction (opposite of apparent wind)
+        e_D = (v_apparent / np.linalg.norm(v_apparent))
+
+        #Defining z direction
+        z_ref = np.array([0, 0, -1])
+
+        # Compute side force direction (perpendicular to drag and up)
+        cross = np.cross(e_D, z_ref)
+        norm = np.linalg.norm(cross)
+       
+        e_Y = cross/norm
+        e_L = np.cross(e_Y, e_D)
+        L_vec = L * e_L
+        D_vec = D * e_D
+
+        F_aero_vec = L_vec + D_vec
         F_a = np.sqrt(L**2 + D**2)
 
         # Store
@@ -86,8 +97,11 @@ def compute_aerodynamics(t, x, y, z, v_global, samples,
         aoa_deg_corrected.append(aoa_deg)
         lift.append(L)
         drag.append(D)
+        lift_vec_list.append(L_vec)
+        drag_vec_list.append(D_vec)
         F_aero.append(F_a)
         F_aero_vec_list.append(F_aero_vec)
+        v_apparent_vec_list.append(v_apparent)
         v_body_x.append(v_kite_body[0])
         v_body_y.append(v_kite_body[1])
         v_body_z.append(v_kite_body[2])
@@ -98,8 +112,11 @@ def compute_aerodynamics(t, x, y, z, v_global, samples,
         'aoa_deg': np.array(aoa_deg_corrected),
         'lift': np.array(lift),
         'drag': np.array(drag),
+        'drag_vec':np.array(drag_vec_list),
+        'lift_vec':np.array(lift_vec_list),
         'F_aero': np.array(F_aero),
         'F_aero_vec': np.array(F_aero_vec_list),
+        'v_apparent_vec': np.array(v_apparent_vec_list),
         'v_body': np.vstack((v_body_x, v_body_y, v_body_z)).T
     }
 

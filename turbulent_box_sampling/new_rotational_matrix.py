@@ -141,9 +141,12 @@ speccheck_unsmooth("Linear_sampling", samples_linear[:,0], freqs_l_u, psd_l_u)
 
 # Smoothing
 n_per_decade = 20  # Set to a value between ~10 and 20 [Need to look at how much I want to smooth]
-smoothed_freqs_helical, smoothed_spectrum_helical = smooth_criminal(psd_h_u, freqs_h_u, n_per_decade)
-smoothed_freqs_linear, smoothed_spectrum_linear = smooth_criminal(psd_l_u, freqs_l_u, n_per_decade)
-
+smoothed_freqs_helical_u, smoothed_spectrum_helical_u = smooth_criminal(psd_h_u, freqs_h_u, n_per_decade)
+smoothed_freqs_linear_u, smoothed_spectrum_linear_u = smooth_criminal(psd_l_u, freqs_l_u, n_per_decade)
+smoothed_freqs_helical_v, smoothed_spectrum_helical_v = smooth_criminal(psd_h_v, freqs_h_v, n_per_decade)
+smoothed_freqs_linear_v, smoothed_spectrum_linear_v = smooth_criminal(psd_l_v, freqs_l_v, n_per_decade)
+smoothed_freqs_helical_w, smoothed_spectrum_helical_w = smooth_criminal(psd_h_w, freqs_h_w, n_per_decade)
+smoothed_freqs_linear_w, smoothed_spectrum_linear_w = smooth_criminal(psd_l_w, freqs_l_w, n_per_decade)
 
 
 #---Calculate Aero parameters for steady & unsteady wind---
@@ -254,23 +257,10 @@ plt.grid(False)
 plt.tight_layout()
 plt.savefig('turbulence_box_slice.pdf')"""
 
-
-#PSD
-plt.figure(figsize=(10,5))
-plt.loglog(freqs_h_u, freqs_h_u*psd_h_u, label='Helical')
-plt.loglog(freqs_l_u, freqs_l_u*psd_l_u, label='Centreline')
-plt.xlabel('Frequency [Hz]', fontsize=16)
-plt.ylabel(r'$fS(f)$ [m$^2$/s$^2$]', fontsize=16)
-plt.xticks(fontsize=14)
-plt.yticks(fontsize=14)
-plt.legend(fontsize=14, loc='lower left')
-plt.grid(True, linestyle=':', alpha=0.7, color='gray')
-plt.tight_layout()
-#plt.savefig('psd_u_helvslin.pdf')
-
-plt.figure(figsize=(10,5))
-plt.loglog(freqs_h_v, freqs_h_v*psd_h_v, label='Helical')
-plt.loglog(freqs_l_v, freqs_l_v*psd_l_v, label='Centreline')
+#PSDS
+"""plt.figure(figsize=(10,5))
+plt.loglog(smoothed_freqs_helical_u, smoothed_freqs_helical_u*smoothed_spectrum_helical_u, label='Helical')
+plt.loglog(smoothed_freqs_linear_u, smoothed_freqs_linear_u*smoothed_spectrum_linear_u, label='Centreline', linestyle='--')
 plt.xlabel('Frequency [Hz]', fontsize=16)
 plt.ylabel(r'$fS(f)$ [m$^2$/s$^2$]', fontsize=16)
 plt.xticks(fontsize=14)
@@ -278,11 +268,12 @@ plt.yticks(fontsize=14)
 plt.legend(fontsize=14)
 plt.grid(True, linestyle=':', alpha=0.7, color='gray')
 plt.tight_layout()
-#plt.savefig('psd_v_helvslin.pdf')
+plt.savefig('psd_u_helvslin.pdf')
 
 plt.figure(figsize=(10,5))
-plt.loglog(freqs_h_w, freqs_h_w*psd_h_w, label='Helical')
-plt.loglog(freqs_l_w, freqs_l_w*psd_l_w, label='Centreline')
+
+plt.loglog(smoothed_freqs_helical_v, smoothed_freqs_helical_v*smoothed_spectrum_helical_v, label='Helical')
+plt.loglog(smoothed_freqs_linear_v, smoothed_freqs_linear_v*smoothed_spectrum_linear_v, label='Centreline', linestyle='--')
 plt.xlabel('Frequency [Hz]', fontsize=16)
 plt.ylabel(r'$fS(f)$ [m$^2$/s$^2$]', fontsize=16)
 plt.xticks(fontsize=14)
@@ -290,16 +281,62 @@ plt.yticks(fontsize=14)
 plt.legend(fontsize=14)
 plt.grid(True, linestyle=':', alpha=0.7, color='gray')
 plt.tight_layout()
-#plt.savefig('psd_w_helvslin.pdf')
+plt.savefig('psd_v_helvslin.pdf')
+
+plt.figure(figsize=(10,5))
+plt.loglog(smoothed_freqs_helical_w, smoothed_freqs_helical_w*smoothed_spectrum_helical_w, label='Helical')
+plt.loglog(smoothed_freqs_linear_w, smoothed_freqs_linear_w*smoothed_spectrum_linear_w, label='Centreline', linestyle='--')
+plt.xlabel('Frequency [Hz]', fontsize=16)
+plt.ylabel(r'$fS(f)$ [m$^2$/s$^2$]', fontsize=16)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+plt.legend(fontsize=14)
+plt.grid(True, linestyle=':', alpha=0.7, color='gray')
+plt.tight_layout()
+plt.savefig('psd_w_helvslin.pdf')
 
 
 plt.figure(figsize=(10,5))
-plt.loglog(smoothed_freqs_helical, smoothed_freqs_helical*smoothed_spectrum_helical, label='Helical u')
-plt.loglog(smoothed_freqs_linear, smoothed_freqs_linear*smoothed_spectrum_linear, label='Linear u')
-plt.xlabel('Frequency [Hz]')
-plt.ylabel(r'fS(f) [$m^2/s^2$]')
-plt.legend()
+plt.semilogx(smoothed_freqs_helical_u, smoothed_freqs_helical_u*smoothed_spectrum_helical_u, label='Helical')
+plt.semilogx(smoothed_freqs_linear_u, smoothed_freqs_linear_u*smoothed_spectrum_linear_u, label='Linear', linestyle='--')
+plt.axvline(x=0.1, color='red', linestyle='--', linewidth=2, alpha=0.7)
+plt.ylabel(r'$fS(f)$ [m$^2$/s$^2$]', fontsize=16)
+plt.xlabel('Frequency [Hz]', fontsize=16)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+plt.legend(fontsize=14)
+plt.grid(True, linestyle=':', alpha=0.7, color='gray')
+plt.tight_layout()
+plt.savefig('psdsemilog_u_helvslin.pdf')
 
+
+plt.figure(figsize=(10,5))
+plt.semilogx(smoothed_freqs_helical_v, smoothed_freqs_helical_v*smoothed_spectrum_helical_v, label='Helical')
+plt.semilogx(smoothed_freqs_linear_v, smoothed_freqs_linear_v*smoothed_spectrum_linear_v, label='Linear', linestyle='--')
+plt.axvline(x=0.1, color='red', linestyle='--', linewidth=2, alpha=0.7)
+plt.xlabel('Frequency [Hz]', fontsize=16)
+plt.ylabel(r'$fS(f)$ [m$^2$/s$^2$]', fontsize=16)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+plt.legend(fontsize=14)
+plt.grid(True, linestyle=':', alpha=0.7, color='gray')
+plt.tight_layout()
+plt.savefig('psdsemilog_v_helvslin.pdf')
+
+
+
+plt.figure(figsize=(10,5))
+plt.semilogx(smoothed_freqs_helical_w, smoothed_freqs_helical_w*smoothed_spectrum_helical_w, label='Helical')
+plt.semilogx(smoothed_freqs_linear_w, smoothed_freqs_linear_w*smoothed_spectrum_linear_w, label='Linear', linestyle='--')
+plt.axvline(x=0.1, color='red', linestyle='--', linewidth=2, alpha=0.7)
+plt.xlabel('Frequency [Hz]', fontsize=16)
+plt.ylabel(r'$fS(f)$ [m$^2$/s$^2$]', fontsize=16)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+plt.legend(fontsize=14)
+plt.grid(True, linestyle=':', alpha=0.7, color='gray')
+plt.tight_layout()
+plt.savefig('psdsemilog_w_helvslin.pdf')
 
 
 #Visualising Helix in Box
@@ -409,7 +446,7 @@ plt.legend(fontsize=14)
 plt.xticks(fontsize=14)
 plt.yticks(fontsize=14)
 plt.grid(True)
-plt.tight_layout()
+plt.tight_layout()"""
 
 # --- Lift Comparison ---
 plt.figure(figsize=(10, 5))
@@ -438,6 +475,7 @@ plt.yticks(fontsize=14)
 plt.grid(True)
 plt.tight_layout()
 #plt.savefig('drag_comparison_15.5.pdf')
+
 
 #Find lift drag ratio
 plt.figure(figsize=(10, 5))
@@ -482,6 +520,77 @@ plt.xticks(fontsize=14)
 plt.yticks(fontsize=14)
 plt.grid(True)
 plt.tight_layout()
+
+# --- Lift Comparison ---
+plt.figure(figsize=(10, 5))
+plt.style.use('tableau-colorblind10')
+plt.plot(t, results_turb['drag_vec'][:, 0], label='D_x (Body X)')
+plt.plot(t, results_turb['drag_vec'][:, 1], label='D_y (Body Y)')
+plt.plot(t, results_turb['drag_vec'][:, 2], label='D_z (Body Z)')
+plt.xlabel('Time [s]', fontsize=16)
+plt.ylabel('Drag [N]', fontsize=16)
+plt.legend(fontsize=14)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+plt.grid(True)
+plt.tight_layout()
+#plt.savefig('drag_comparison_15.5.pdf')
+
+# --- Drag Comparison ---
+plt.figure(figsize=(10, 5))
+plt.style.use('tableau-colorblind10')
+plt.plot(t, results_turb['lift_vec'][:, 0], label='L_x (Body X)')
+plt.plot(t, results_turb['lift_vec'][:, 1], label='L_y (Body Y)')
+plt.plot(t, results_turb['lift_vec'][:, 2], label='L_z (Body Z)')
+plt.xlabel('Time [s]', fontsize=16)
+plt.ylabel('Lift [N]', fontsize=16)
+plt.legend(fontsize=14)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+plt.grid(True)
+plt.tight_layout()
+#plt.savefig('drag_comparison_15.5.pdf')
+
+plt.figure(figsize=(10, 5))
+plt.style.use('tableau-colorblind10')
+plt.plot(t, results_turb['v_apparent_vec'][:, 0], label='V_a (Body X)')
+plt.plot(t, results_turb['v_apparent_vec'][:, 1], label='V_a (Body Y)')
+plt.plot(t, results_turb['v_apparent_vec'][:, 2], label='V_a (Body Z)')
+plt.xlabel('Time [s]', fontsize=16)
+plt.ylabel('V_apparent [m/s]', fontsize=16)
+plt.legend(fontsize=14)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+plt.grid(True)
+plt.tight_layout()
+
+#Apparent Wind Angle
+plt.figure(figsize=(10, 5))
+plt.style.use('tableau-colorblind10')
+plt.plot(t, results_noturb['awa_deg'], label='Steady')
+plt.plot(t, results_turb['awa_deg'], label='Unsteady', alpha=0.7)
+plt.xlabel('Time [s]', fontsize=16)
+plt.ylabel('Apparent Wind Angle [deg]', fontsize=16)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+plt.legend(fontsize=14)
+plt.grid(True)
+plt.tight_layout()
+
+
+# AoA Comparison Plot
+plt.figure(figsize=(10, 5))
+plt.style.use('tableau-colorblind10')
+plt.plot(t, results_noturb['aoa_deg'], label='Steady')
+plt.plot(t, results_turb['aoa_deg'], label='Unsteady', alpha=0.7)
+plt.xlabel('Time [s]', fontsize=16)
+plt.ylabel('Angle of Attack [deg]', fontsize=16)
+plt.legend(fontsize=14)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+plt.grid(True)
+plt.tight_layout()
+#plt.savefig('aoa_9.5_comparison.png')
 
 plt.show()
 
